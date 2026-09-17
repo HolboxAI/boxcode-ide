@@ -1,9 +1,9 @@
 {
-  "url": "https://github.com/HolboxAI/boxcode-ide/releases/download/1.126.0.242/Boxcode-darwin-arm64-1.126.0.242.zip",
-  "name": "1.126.0.242",
-  "version": "ea88df14199620072ab5a214d51315099280c53d",
-  "productVersion": "1.126.0.242",
-  "hash": "87c68564dd93d8eb4e139c3d6e5743ebb8a14adb",
-  "timestamp": "1789562113778",
-  "sha256hash": "b28b2b5c43917009191cbfeaa79b8829b2c002d451fafd7fac38c2b029738912"
+  "url": "https://github.com/HolboxAI/boxcode-ide/releases/download/1.126.0.244/Boxcode-darwin-arm64-1.126.0.244.zip",
+  "name": "1.126.0.244",
+  "version": "3a4a9e3b24ab74530cc52727f7a58c7900a2cf5d",
+  "productVersion": "1.126.0.244",
+  "hash": "944054a84ea8bd89737b8f3120896037ded3789f",
+  "timestamp": "1789648269292",
+  "sha256hash": "dcc7c0204bbf27ecd4c9566e90c1c85ec91eb6328a6c627a043963310965c051"
 }
