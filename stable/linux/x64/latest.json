@@ -1,9 +1,9 @@
 {
-  "url": "https://github.com/HolboxAI/boxcode-ide/releases/download/1.126.0.252/Boxcode-linux-x64-1.126.0.252.tar.gz",
-  "name": "1.126.0.252",
-  "version": "91bc85cf54b80ae2ba3b5ad063843256a65a5a4e",
-  "productVersion": "1.126.0.252",
-  "hash": "bab33cb00bad76fe6505201c53cbfba43370986c",
-  "timestamp": "1790241591460",
-  "sha256hash": "bcab9a380a141e118208e4a57f511c1a89999b84855940d3a5f6b21da66093e7"
+  "url": "https://github.com/HolboxAI/boxcode-ide/releases/download/1.126.0.306/Boxcode-linux-x64-1.126.0.306.tar.gz",
+  "name": "1.126.0.306",
+  "version": "070cd2fd63af56007d5a55057385a9ca61cf4931",
+  "productVersion": "1.126.0.306",
+  "hash": "d4ede0204277030fea070fb03e92620240747090",
+  "timestamp": "1790692156853",
+  "sha256hash": "475d35669607fd596d6170b95e5e87f8cdaf3a6aff9beff2f1ce975be4c5ae1b"
 }
