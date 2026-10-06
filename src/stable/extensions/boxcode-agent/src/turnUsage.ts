@@ -14,10 +14,9 @@ import type { SessionUpdate } from './acpClient';
  * per-response token spend (per that variant's own doc comment, the closest
  * proxy ACP's `usage_update` has to billing), so this *sums* across the
  * turn; if boxcode ever starts emitting cumulative totals instead, this is
- * the one line to revisit. `size` is context-window occupancy, which boxcode
- * currently always sends as `0` (it doesn't track the model's context limit
- * anywhere yet) -- the footnote omits the "of N" half until a real value
- * arrives.
+ * the one line to revisit. `size` is the model's context window: when boxcode
+ * knows it (configured `context_window` or a provider default) the footnote
+ * adds the "of N" half; `0` means unknown and it is omitted.
  *
  * Consumed rather than rendered inline by `renderUpdate`: printing a count
  * per update would spam several numbers mid-stream, and the per-turn total

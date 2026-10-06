@@ -70,3 +70,31 @@ test('sessionUsageMeter appends an estimated cost when a rate is given', () => {
 test('sessionUsageMeter keeps sub-cent estimates non-zero', () => {
 	assert.equal(sessionUsageMeter(1000, 0.35), '1,000 tokens · ~$0.00035');
 });
+
+test('occupancy() tracks the latest used and window() the latest size', () => {
+	const session = createSessionUsage();
+	session.record(usageUpdate(1000, 131072));
+	session.record(usageUpdate(250, 200000));
+	assert.equal(session.total(), 1250);
+	assert.equal(session.occupancy(), 250);
+	assert.equal(session.window(), 200000);
+});
+
+test('sessionUsageMeter shows occupancy "N/M" when a window is known', () => {
+	assert.equal(sessionUsageMeter(1250, undefined, 250, 200000), '250/200,000 tokens');
+	assert.equal(sessionUsageMeter(1_000_000, 0.35, 500, 131072), '500/131,072 tokens · ~$0.35');
+});
+
+test('sessionUsageMeter falls back to the cumulative count when no window', () => {
+	assert.equal(sessionUsageMeter(1250, undefined, 250, 0), '1,250 tokens');
+	assert.equal(sessionUsageMeter(1250, undefined, 250, undefined), '1,250 tokens');
+});
+
+test('reset() also clears occupancy and window', () => {
+	const session = createSessionUsage();
+	session.record(usageUpdate(1000, 131072));
+	session.reset();
+	assert.equal(session.total(), 0);
+	assert.equal(session.occupancy(), 0);
+	assert.equal(session.window(), 0);
+});

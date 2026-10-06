@@ -374,7 +374,12 @@ export function activate(context: vscode.ExtensionContext): void {
 	usageIndicator.name = 'boxcode: usage';
 	context.subscriptions.push(usageIndicator);
 	const updateUsageIndicator = (): void => {
-		const label = sessionUsageMeter(sessionUsage.total(), sessionCostRate());
+		const label = sessionUsageMeter(
+			sessionUsage.total(),
+			sessionCostRate(),
+			sessionUsage.occupancy(),
+			sessionUsage.window(),
+		);
 		if (label) {
 			usageIndicator.text = `$(graph) ${label}`;
 			usageIndicator.tooltip = `boxcode usage this session — ${label}`;

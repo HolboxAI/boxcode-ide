@@ -159,9 +159,8 @@ export interface SessionUpdate {
 	kind?: string;
 	status?: ToolCallStatus;
 	/** `usage_update`'s flattened fields (`used` = token spend of one LLM
-	 * response, `size` = context-window occupancy, `0` while boxcode
-	 * doesn't track the context limit) -- see `turnUsage.ts` for how one
-	 * turn's updates combine. */
+	 * response, `size` = the model's context window, `0` when boxcode doesn't
+	 * know it) -- see `turnUsage.ts` / `sessionUsage.ts` for how they combine. */
 	used?: number;
 	size?: number;
 	[key: string]: unknown;
