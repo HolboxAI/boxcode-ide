@@ -58,6 +58,24 @@ test('an input-like role includes its current value', () => {
 	assert.equal(serializeAxTree(nodes), ['rootwebarea', '  textbox "Search" = "query"'].join('\n'));
 });
 
+test('a link surfaces its href target from the url property', () => {
+	const nodes: AxNode[] = [
+		node('1', 'rootwebarea', { childIds: ['2'] }),
+		node('2', 'link', { name: { value: 'About' }, properties: [{ name: 'url', value: { value: '/about' } }] }),
+	];
+
+	assert.equal(serializeAxTree(nodes), ['rootwebarea', '  link "About" → /about'].join('\n'));
+});
+
+test('a non-link node ignores a url property', () => {
+	const nodes: AxNode[] = [
+		node('1', 'rootwebarea', { childIds: ['2'] }),
+		node('2', 'button', { name: { value: 'Go' }, properties: [{ name: 'url', value: { value: '/go' } }] }),
+	];
+
+	assert.equal(serializeAxTree(nodes), ['rootwebarea', '  button "Go"'].join('\n'));
+});
+
 test('a tree wider than the cap is cut off with an explicit marker', () => {
 	const children: string[] = [];
 	const nodes: AxNode[] = [node('root', 'rootwebarea', { childIds: children })];

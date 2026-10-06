@@ -36,6 +36,7 @@ import {
 import { CdpClient } from './cdpClient';
 import { serializeAxTree, AxNode } from './axTree';
 import { boxcodeBinaryCandidates } from './boxcodeBinary';
+import { keyPressEvents, SUPPORTED_KEYS } from './browserKeys';
 import {
 	parsePermissionCommandArgs,
 	parseReviewCommandArgs,
@@ -2518,41 +2519,81 @@ async function checkInBrowser(url: string): Promise<CheckInBrowserOutcome> {
 }
 
 /**
- * Fulfills `interact_in_browser` on the client side: clicks or types into
- * the SAME tab `checkInBrowser` already looked at (no fresh navigation --
- * see `attachToBrowserTab`'s own doc comment for why), via CDP's `Input`
- * domain, then screenshots the result the same way `checkInBrowser` does so
+ * Fulfills `interact_in_browser` on the client side: clicks, types, presses
+ * a key, or navigates in the SAME tab `checkInBrowser` already looked at (no
+ * fresh navigation on attach -- see `attachToBrowserTab`'s own doc comment
+ * for why), then screenshots the result the same way `checkInBrowser` does so
  * the model sees what actually happened rather than guessing.
  *
- * `Input.dispatchMouseEvent` needs an explicit press-then-release pair --
- * a single event with no `type` distinction is not a click, it is a mouse
+ * `Input.dispatchMouseEvent` needs an explicit press-then-release pair -- a
+ * single event with no `type` distinction is not a click, it is a mouse
  * sitting at a point. `Input.insertText` (rather than synthesizing
  * `Input.dispatchKeyEvent` per character) inserts at whatever element
  * currently has focus, the same primitive Playwright's own `page.fill()`
- * uses -- simpler and more reliable than simulating individual keystrokes
- * for the click+type slice this is scoped to.
+ * uses. A `key` press is the two `Input.dispatchKeyEvent` messages from
+ * `keyPressEvents` (keyDown then keyUp); an unknown key is rejected, not
+ * guessed. `navigate` runs `Page.navigate` against `interaction.target`.
+ *
+ * A click or key can navigate (submit a form, follow a link) and `navigate`
+ * always does, so a bounded `Page.loadEventFired` waiter is armed *before*
+ * the action and awaited after it -- otherwise the screenshot would capture a
+ * mid-navigation blank page rather than the result the model is asserting
+ * against. `type` never navigates, so it skips the wait and screenshots the
+ * steady state immediately. The short ceiling for click/key (rather than
+ * gating on `Page.frameStartedNavigating`) is a deliberate simplicity call: a
+ * non-navigating action just waits out the cap, and a slow real navigation is
+ * still screenshot as-is -- useful evidence, not a reason to fail.
  *
  * Never throws, same posture and same reason as `checkInBrowser`.
  */
+const NAV_LOAD_WAIT_MS = 10_000;   // `navigate` always navigates -- same bound as `checkInBrowser`.
+const POST_ACTION_NAV_MS = 2_000;  // a click/key MAY navigate; cap the wait so a non-navigating action doesn't stall.
 async function interactInBrowser(url: string, interaction: BrowserInteraction): Promise<InteractInBrowserOutcome> {
 	let attachment: BrowserPageAttachment | undefined;
 	try {
 		attachment = await attachToBrowserTab(url);
-		if (interaction.action === 'click') {
-			const { x, y } = interaction;
-			await attachment.cdp.send(
-				'Input.dispatchMouseEvent',
-				{ type: 'mousePressed', x, y, button: 'left', clickCount: 1 },
-				attachment.sessionId,
-			);
-			await attachment.cdp.send(
-				'Input.dispatchMouseEvent',
-				{ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 },
-				attachment.sessionId,
-			);
-		} else {
-			await attachment.cdp.send('Input.insertText', { text: interaction.text }, attachment.sessionId);
+
+		// Arm the load waiter BEFORE dispatching so a navigation is never
+		// missed; `type` never navigates, so it gets no waiter at all.
+		const waitMs = interaction.action === 'navigate' ? NAV_LOAD_WAIT_MS : POST_ACTION_NAV_MS;
+		const loaded =
+			interaction.action === 'type'
+				? Promise.resolve(undefined)
+				: attachment.cdp.waitForEvent('Page.loadEventFired', waitMs).catch(() => undefined);
+
+		switch (interaction.action) {
+			case 'click': {
+				const { x, y } = interaction;
+				await attachment.cdp.send(
+					'Input.dispatchMouseEvent',
+					{ type: 'mousePressed', x, y, button: 'left', clickCount: 1 },
+					attachment.sessionId,
+				);
+				await attachment.cdp.send(
+					'Input.dispatchMouseEvent',
+					{ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 },
+					attachment.sessionId,
+				);
+				break;
+			}
+			case 'type':
+				await attachment.cdp.send('Input.insertText', { text: interaction.text }, attachment.sessionId);
+				break;
+			case 'key': {
+				const events = keyPressEvents(interaction.key);
+				if (!events) {
+					return { outcome: 'failed', reason: `Unsupported key "${interaction.key}" (supported: ${SUPPORTED_KEYS}).` };
+				}
+				await attachment.cdp.send('Input.dispatchKeyEvent', events.keyDown, attachment.sessionId);
+				await attachment.cdp.send('Input.dispatchKeyEvent', events.keyUp, attachment.sessionId);
+				break;
+			}
+			case 'navigate':
+				await attachment.cdp.send('Page.navigate', { url: interaction.target }, attachment.sessionId);
+				break;
 		}
+
+		await loaded;
 
 		const data = await captureScreenshot(attachment);
 		const axTree = await captureAccessibilityTree(attachment);
