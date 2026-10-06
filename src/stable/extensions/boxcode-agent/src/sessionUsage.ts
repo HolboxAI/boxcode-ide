@@ -28,14 +28,22 @@ export interface SessionUsage {
 	/** Feed every session update; non-`usage_update`s are ignored, and the
 	 * same defensive `used` parse as `turnUsage` applies. */
 	record(update: SessionUpdate): void;
-	/** Running token total across the current session. */
+	/** Running token total across the current session (the cost feed). */
 	total(): number;
-	/** Zero the total -- called when the session is discarded. */
+	/** The most recent response's token count -- the closest proxy boxcode has
+	 * to current context occupancy, since ACP's `usage_update` reports one
+	 * combined `used` per response rather than a live window fill. */
+	occupancy(): number;
+	/** The model's context window in tokens, `0` when boxcode doesn't know it. */
+	window(): number;
+	/** Zero the totals -- called when the session is discarded. */
 	reset(): void;
 }
 
 export function createSessionUsage(): SessionUsage {
 	let used = 0;
+	let lastUsed = 0;
+	let lastSize = 0;
 	return {
 		record(update) {
 			if (update.sessionUpdate !== 'usage_update') {
@@ -45,12 +53,24 @@ export function createSessionUsage(): SessionUsage {
 				return;
 			}
 			used += update.used;
+			lastUsed = update.used;
+			if (typeof update.size === 'number' && Number.isFinite(update.size) && update.size > 0) {
+				lastSize = update.size;
+			}
 		},
 		total() {
 			return used;
 		},
+		occupancy() {
+			return lastUsed;
+		},
+		window() {
+			return lastSize;
+		},
 		reset() {
 			used = 0;
+			lastUsed = 0;
+			lastSize = 0;
 		},
 	};
 }
@@ -81,11 +101,22 @@ export function sessionUsageFootnote(totalTokens: number, costPerMillionTokens?:
  * first real spend). Mirrors `sessionUsageFootnote` but drops the "this
  * session" suffix so it reads naturally as a persistent meter.
  */
-export function sessionUsageMeter(totalTokens: number, costPerMillionTokens?: number): string | undefined {
+export function sessionUsageMeter(
+	totalTokens: number,
+	costPerMillionTokens?: number,
+	occupancyTokens?: number,
+	contextLimit?: number,
+): string | undefined {
 	if (totalTokens <= 0) {
 		return undefined;
 	}
-	const tokens = `${groupDigits(totalTokens)} tokens`;
+	// When boxcode reports a real context window, the always-visible meter shows
+	// occupancy ("N/M tokens") -- the one thing a bare cumulative count cannot
+	// honestly claim. Otherwise it falls back to the cumulative session count.
+	const hasWindow = typeof contextLimit === 'number' && Number.isFinite(contextLimit) && contextLimit > 0;
+	const tokens = hasWindow
+		? `${groupDigits(occupancyTokens ?? totalTokens)}/${groupDigits(contextLimit)} tokens`
+		: `${groupDigits(totalTokens)} tokens`;
 	if (costPerMillionTokens === undefined) {
 		return tokens;
 	}
