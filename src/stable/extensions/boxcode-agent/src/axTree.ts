@@ -29,7 +29,15 @@ export interface AxNode {
 	role?: { value?: string };
 	name?: { value?: string };
 	value?: { value?: string };
+	properties?: AxProperty[];
 	childIds?: string[];
+}
+
+/** One `Accessibility.AXProperty` -- a named `AXValue`, of which only the
+ * `url` name (a link's href) is read today. */
+export interface AxProperty {
+	name?: string;
+	value?: { value?: string };
 }
 
 /** Ceiling on how many nodes one snapshot may emit — the token bound that is
@@ -123,6 +131,15 @@ export function serializeAxTree(nodes: AxNode[]): string {
 				}
 				if (value && VALUE_ROLES.has(role)) {
 					line += ` = "${value}"`;
+				}
+				// A link's target lives in `properties` (name "url"), not in
+				// `value` -- surface it so the model can follow the link by
+				// reading where it goes, rather than only its label.
+				const href = (node.properties ?? [])
+					.find(p => p.name === 'url')
+					?.value?.value?.trim();
+				if (href && role === 'link') {
+					line += ` → ${href}`;
 				}
 				lines.push(line);
 				emitted += 1;

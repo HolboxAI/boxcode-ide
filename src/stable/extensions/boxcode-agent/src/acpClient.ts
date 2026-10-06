@@ -207,14 +207,18 @@ export type CheckInBrowserOutcome =
 
 /**
  * Mirrors `boxcode`'s own `tools::BrowserInteraction` exactly (internally
- * tagged on `action`, `rename_all = "snake_case"`) -- the smallest safe
- * first slice of the agent-driven browser loop: click and type only, no
- * key-press support and no `Runtime.evaluate`/arbitrary JS, both
- * deliberately deferred to a follow-up.
+ * tagged on `action`, `rename_all = "snake_case"`). Click, type, key-press,
+ * and navigate complete the agent-driven browser loop (see
+ * `docs/BACKLOG.md`, "Agent-driven browser automation"). `Runtime.evaluate` /
+ * arbitrary JS is deliberately absent -- assertion stays on the
+ * accessibility-tree + screenshot observation, which keeps the extension out
+ * of the `Runtime` domain entirely.
  */
 export type BrowserInteraction =
 	| { action: 'click'; x: number; y: number }
-	| { action: 'type'; text: string };
+	| { action: 'type'; text: string }
+	| { action: 'key'; key: string }
+	| { action: 'navigate'; target: string };
 
 /**
  * `session/interactInBrowser` -- same non-ACP-spec shape and reasoning as
