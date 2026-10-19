@@ -58,6 +58,7 @@ import {
 import { findLocalhostUrl, findReusableBrowserTab, localhostOrigin } from './localhostUrl';
 import { agentSupportsMcp, loadMcpConfig, mcpServersForSession } from './mcpLoader';
 import { referenceContextSection } from './referenceContent';
+import { latestTurn } from './rollback';
 import { describeError, describeStartupFailure, AcpUnsupportedError } from './startupFailure';
 import { createTurnUsage, TurnUsage } from './turnUsage';
 import { createSessionUsage, sessionUsageFootnote, sessionUsageMeter, SessionUsage } from './sessionUsage';
@@ -864,6 +865,34 @@ export function activate(context: vscode.ExtensionContext): void {
 				void vscode.window.showInformationMessage(`covexcode: ${summary}`);
 			} catch (error) {
 				void vscode.window.showErrorMessage(`covexcode: couldn't roll back (${describeError(error)})`);
+			}
+		}),
+	);
+
+	context.subscriptions.push(
+		// "Undo Last Query": the one-keystroke undo for the common case. Unlike
+		// `covexcode.rollback` (which opens the full everything/turn/file picker,
+		// defaulting to the whole session) this restores only the most recent
+		// query -- every file touched at that turn or later goes back to its
+		// state just before that turn began, so earlier turns survive.
+		vscode.commands.registerCommand('covexcode.undoLastTurn', async () => {
+			if (!client || !sessionId) {
+				void vscode.window.showInformationMessage("covexcode: no session yet -- send a message first.");
+				return;
+			}
+			const activeClient = client;
+			const activeSessionId = sessionId;
+			try {
+				const { changes, shellWarning } = await activeClient.listChanges(activeSessionId);
+				const turn = latestTurn(changes);
+				if (turn === undefined) {
+					void vscode.window.showInformationMessage('covexcode: nothing to undo.');
+					return;
+				}
+				const summary = await activeClient.rollback(activeSessionId, { restoreBeforeTurn: turn });
+				void vscode.window.showInformationMessage(`covexcode: [turn ${turn}] ${summary}${shellWarning ? ` ${shellWarning}` : ''}`);
+			} catch (error) {
+				void vscode.window.showErrorMessage(`covexcode: couldn't undo the last query (${describeError(error)})`);
 			}
 		}),
 	);
@@ -1836,6 +1865,14 @@ async function askPermission(
 	} else {
 		stream.markdown(permissionDecisionMarkdown(action, allowLabel, rejectLabel, id, hunks));
 	}
+	// A visible loader while the decision is pending: the chat panel's Send is
+	// disabled for the whole of this turn (see `chatPermission.ts`'s doc
+	// comment), so without an explicit progress part the only motion on screen
+	// is the pending tool row -- and after the user clicks Allow that row is
+	// the *only* remaining signal that the action is actually running. A
+	// progress part renders a spinner in the response itself, giving the
+	// click immediate, visible feedback instead of a silent prompt vanish.
+	stream.progress('Waiting for your decision…');
 	const answer = await wait;
 	pendingReviews.delete(id);
 	// The user answered (Allow/Reject/Review). Remove the prompt from chat:
@@ -1843,6 +1880,9 @@ async function askPermission(
 	// row pushed above, so the question -- and its now-dead links -- vanish
 	// rather than lingering as an unclickable card for the rest of the turn.
 	stream.clearToPreviousToolInvocation(vscode.ChatResponseClearToPreviousToolInvocationReason.NoReason);
+	if (answer.choice !== 'cancelled') {
+		stream.progress(`Running: ${action}`);
+	}
 	return permissionOutcomeFromGate(answer, allow, reject);
 }
 

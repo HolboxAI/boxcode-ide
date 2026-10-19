@@ -73,6 +73,11 @@
         "category": "covexcode"
       },
       {
+        "command": "covexcode.undoLastTurn",
+        "title": "covexcode: Undo Last Query",
+        "category": "covexcode"
+      },
+      {
         "command": "covexcode.signIn",
         "title": "covexcode: Sign In to covexcode.com",
         "category": "covexcode"
