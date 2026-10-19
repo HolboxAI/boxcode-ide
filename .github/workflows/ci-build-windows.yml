@@ -44,7 +44,7 @@ env:
   APP_NAME: Covexcode
   ASSETS_REPOSITORY: ${{ github.repository }}
   BINARY_NAME: covexcode-ide
-  DISABLE_UPDATE: yes
+  DISABLE_UPDATE: no
   GH_REPO_PATH: ${{ github.repository }}
   GITHUB_BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.head }}
   ORG_NAME: ${{ github.repository_owner }}
@@ -345,3 +345,21 @@ jobs:
             exit 1
           fi
           gh release upload "$TAG" --repo "${{ github.repository }}" --clobber "${files[@]}"
+
+      # Publish one rolling update feed per arch that actually produced a
+      # portable .zip (the archive updater target). x64/arm64 both always
+      # produce the zip; publish_update_feed.sh skips the optional installer
+      # targets (system/user exe, msi) that a given arch didn't produce and
+      # no-ops cleanly for an arch whose build leg failed.
+      - name: Publish update feed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OS_NAME: windows
+          VSCODE_QUALITY: stable
+        run: |
+          for arch in x64 arm64; do
+            if compgen -G "assets/*-${arch}-*.zip" > /dev/null; then
+              echo "Publishing ${arch} update feed..."
+              VSCODE_ARCH="${arch}" ./publish_update_feed.sh
+            fi
+          done
